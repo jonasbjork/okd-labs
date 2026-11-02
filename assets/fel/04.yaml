@@ -1,0 +1,50 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+      - name: web
+        image: docker.io/library/python:3.12-slim
+        command:
+        - python
+        - "-u"
+        - "/opt/lab/server.py"
+        workingDir: "/tmp"
+        env:
+        - name: APP_VERSION
+          value: v1
+        ports:
+        - name: http
+          containerPort: 8080
+        volumeMounts:
+        - name: code
+          mountPath: "/opt/lab"
+          readOnly: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        readinessProbe:
+          httpGet:
+            path: "/does-not-exist"
+            port: http
+          periodSeconds: 5
+      volumes:
+      - name: code
+        configMap:
+          name: lab-code

@@ -1,0 +1,66 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: lab-web
+parameters:
+- name: NAME
+  description: Resursnamn och app-label
+  value: web
+  required: true
+- name: MESSAGE
+  description: Hälsning
+  value: Hej från en Template
+- name: IMAGE
+  value: docker.io/library/python:3.12-slim
+  required: true
+objects:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: ${NAME}
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: ${NAME}
+    template:
+      metadata:
+        labels:
+          app: ${NAME}
+      spec:
+        containers:
+        - name: web
+          image: ${IMAGE}
+          command: [python, -u, /opt/lab/server.py]
+          env:
+          - name: MESSAGE
+            value: ${MESSAGE}
+          ports:
+          - name: http
+            containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+          - name: code
+            mountPath: /opt/lab
+            readOnly: true
+        volumes:
+        - name: code
+          configMap:
+            name: lab-code
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: ${NAME}
+  spec:
+    selector:
+      app: ${NAME}
+    ports:
+    - name: http
+      port: 80
+      targetPort: http

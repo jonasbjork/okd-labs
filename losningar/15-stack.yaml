@@ -1,0 +1,240 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: site-config
+data:
+  MESSAGE: Välkommen till min portal
+  BACKEND_MESSAGE: Backend är redo
+  BACKEND_URL: http://backend/
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: web-secret
+type: Opaque
+stringData:
+  token: training-token-v1
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: web-data
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: web
+        image: docker.io/library/python:3.12-slim
+        command:
+        - python
+        - "-u"
+        - "/opt/lab/server.py"
+        workingDir: "/tmp"
+        env:
+        - name: APP_VERSION
+          value: v1
+        - name: MESSAGE
+          valueFrom:
+            configMapKeyRef:
+              name: site-config
+              key: BACKEND_MESSAGE
+        ports:
+        - name: http
+          containerPort: 8080
+        volumeMounts:
+        - name: code
+          mountPath: "/opt/lab"
+          readOnly: true
+        - name: data
+          mountPath: "/data"
+        - name: secret
+          mountPath: "/etc/lab-secret"
+          readOnly: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: "/ready"
+            port: http
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 1
+        livenessProbe:
+          httpGet:
+            path: "/live"
+            port: http
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: "/live"
+            port: http
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 30
+      volumes:
+      - name: code
+        configMap:
+          name: lab-code
+      - name: data
+        persistentVolumeClaim:
+          claimName: web-data
+      - name: secret
+        secret:
+          secretName: web-secret
+  strategy:
+    type: Recreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: backend
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+      - name: web
+        image: docker.io/library/python:3.12-slim
+        command:
+        - python
+        - "-u"
+        - "/opt/lab/server.py"
+        workingDir: "/tmp"
+        env:
+        - name: APP_VERSION
+          value: v1
+        - name: MESSAGE
+          valueFrom:
+            configMapKeyRef:
+              name: site-config
+              key: MESSAGE
+        - name: BACKEND_URL
+          valueFrom:
+            configMapKeyRef:
+              name: site-config
+              key: BACKEND_URL
+        ports:
+        - name: http
+          containerPort: 8080
+        volumeMounts:
+        - name: code
+          mountPath: "/opt/lab"
+          readOnly: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: "/ready"
+            port: http
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 1
+        livenessProbe:
+          httpGet:
+            path: "/live"
+            port: http
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: "/live"
+            port: http
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 30
+      volumes:
+      - name: code
+        configMap:
+          name: lab-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector:
+    app: web
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: web
+spec:
+  to:
+    kind: Service
+    name: web
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
