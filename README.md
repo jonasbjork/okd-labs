@@ -13,7 +13,7 @@ Här utförs träningen på **OKD 4.22**. Detta är eget utbildningsmaterial.
 > 
 > Vill du stödja mitt arbete? Bjud mig på en kaffe!
 
-<center><a link="https://www.buymeacoffee.com/jonasbjork"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" /></a></center>
+<center><a link="https://www.buymeacoffee.com/jonasbjork"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" style="widht: 200px"/></a></center>
 
 ## Välj laboration
 
